@@ -1,0 +1,61 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.36.0.
+--
+-- see: https://github.com/sol/hpack
+
+name:           myrequest
+version:        0.1.0.0
+synopsis:       Simple and free reqeust warped http-client
+description:    Simple and free reqeust warped http-client
+category:       HTTP
+homepage:       https://github.com/diqye/appm.git#readme
+bug-reports:    https://github.com/diqye/appm.git/issues
+author:         diqye
+maintainer:     diqye@foxmail.com
+copyright:      copyright
+license:        BSD3
+build-type:     Simple
+
+source-repository head
+  type: git
+  location: https://github.com/diqye/appm.git
+
+library
+  exposed-modules:
+      HTTP.Myrequest
+  other-modules:
+      Paths_myrequest
+  hs-source-dirs:
+      src
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , connection
+    , data-default-class
+    , http-client
+    , http-client-tls
+    , http-types
+    , network
+  default-language: Haskell2010
+
+executable myrequest-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_myrequest
+  hs-source-dirs:
+      app
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      aeson
+    , base >=4.7 && <5
+    , bytestring
+    , connection
+    , data-default-class
+    , http-client
+    , http-client-tls
+    , http-types
+    , myrequest
+    , network
+  default-language: Haskell2010

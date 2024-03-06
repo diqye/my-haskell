@@ -1,0 +1,53 @@
+name:                myhdbc
+version:             0.1.0.0
+github:              "diqye/appm.git"
+license:             BSD3
+author:              "diqye"
+maintainer:          "diqye@foxmail.com"
+copyright:           "copyright"
+category:            "HTTP"
+synopsis:            "HDBC version of MonadTrnas"
+
+extra-source-files: []
+# - README.md
+# - ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: Simple and free reqeust warped http-client
+
+dependencies:
+- base >= 4.7 && < 5
+- aeson
+
+library:
+  source-dirs: src
+
+#
+executables:
+ myhdbc-exe:
+   main:                Main.hs
+   source-dirs:         app
+   ghc-options:
+   - -threaded
+   - -rtsopts
+   - -with-rtsopts=-N
+   dependencies:
+   - myhdbc
+
+#
+# tests:
+#   appm-test:
+#     main:                Spec.hs
+#     source-dirs:         test
+#     ghc-options:
+#     - -threaded
+#     - -rtsopts
+#     - -with-rtsopts=-N
+#     dependencies:
+#     - appm

@@ -23,13 +23,29 @@ description: Simple and free reqeust warped http-client
 
 dependencies:
 - base >= 4.7 && < 5
-- aeson
 - myrequest
 - transformers
 - data-default-class
 - bytestring
 - text
 - unordered-containers
+- mydefault
+- lens
+- aeson
+- lens-aeson
+
+ghc-options:
+- -Wall
+- -fno-warn-missing-signatures
+- -fno-warn-type-defaults
+- -fno-warn-name-shadowing
+- -fno-warn-orphans
+- -fno-warn-incomplete-uni-patterns
+- -fno-warn-unused-top-binds
+- -fno-warn-unused-imports
+- -XExtendedDefaultRules
+- -XOverloadedStrings
+
 
 library:
   source-dirs: src
@@ -45,6 +61,7 @@ executables:
    - -with-rtsopts=-N
    dependencies:
    - mygpt
+   - raw-strings-qq
 
 #
 # tests:

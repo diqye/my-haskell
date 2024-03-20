@@ -1,0 +1,20 @@
+project: mytest
+messages:
+- role: system
+  content: hello
+- role: |
+    defaults:
+      adapter:  postgres
+      host:     localhost
+
+    development:
+      database: myapp_development
+      adapter:  postgres
+      host:     localhost
+
+    test:
+      database: myapp_test
+      adapter:  postgres
+      host:     localhost
+  content:  hello assistent
+- role: assistent

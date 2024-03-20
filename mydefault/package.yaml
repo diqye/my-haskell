@@ -1,6 +1,6 @@
-name:                myhdbc
+name:                mydefault
 version:             0.1.0.0
-github:              "diqye/appm.git"
+github:              "diqye/my-haskell.git"
 license:             BSD3
 author:              "diqye"
 maintainer:          "diqye@foxmail.com"
@@ -23,23 +23,38 @@ description: Simple and free reqeust warped http-client
 
 dependencies:
 - base >= 4.7 && < 5
+- lens
 - aeson
-- aeson-lens
+- lens-aeson
+
+ghc-options:
+- -Wall
+- -fno-warn-missing-signatures
+- -fno-warn-type-defaults
+- -fno-warn-name-shadowing
+- -fno-warn-orphans
+- -fno-warn-incomplete-uni-patterns
+- -fno-warn-unused-top-binds
+- -fno-warn-unused-imports
+- -XExtendedDefaultRules
+- -XOverloadedStrings
+
 
 library:
   source-dirs: src
 
 #
-executables:
- myhdbc-exe:
-   main:                Main.hs
-   source-dirs:         app
-   ghc-options:
-   - -threaded
-   - -rtsopts
-   - -with-rtsopts=-N
-   dependencies:
-   - myhdbc
+# executables:
+#  myhdbc-exe:
+#    main:                Main.hs
+#    source-dirs:         app
+#    ghc-options:
+#    - -threaded
+#    - -rtsopts
+#    - -with-rtsopts=-N
+#    dependencies:
+#    - mydefault
+#    - raw-strings-qq
 
 #
 # tests:

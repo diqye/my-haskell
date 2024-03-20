@@ -24,15 +24,20 @@ source-repository head
 library
   exposed-modules:
       AI.ChatGPT
+      AI.Datas
   other-modules:
       Paths_mygpt
   hs-source-dirs:
       src
+  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings
   build-depends:
       aeson
     , base >=4.7 && <5
     , bytestring
     , data-default-class
+    , lens
+    , lens-aeson
+    , mydefault
     , myrequest
     , text
     , transformers
@@ -45,14 +50,18 @@ executable mygpt-exe
       Paths_mygpt
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , base >=4.7 && <5
     , bytestring
     , data-default-class
+    , lens
+    , lens-aeson
+    , mydefault
     , mygpt
     , myrequest
+    , raw-strings-qq
     , text
     , transformers
     , unordered-containers

@@ -1,33 +1,39 @@
-{-# LANGUAGE OverloadedStrings,DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric #-}
 module AI.ChatGPT where
 
 import qualified HTTP.Myrequest as H
-import Control.Monad.IO.Class(liftIO,MonadIO)
+import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Trans.Reader(ReaderT(ReaderT),ask,runReaderT)
 import Control.Monad.Trans.Except
 import qualified Data.Aeson as A
+import Data.Aeson((.=))
 import qualified Data.Aeson.Types as A
 import Data.String(fromString)
 import Data.Text(Text)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as L
+import qualified Data.ByteString.Lazy.Char8 as L
 import qualified Data.ByteString.Char8 as B
 import Control.Monad.Trans.Class(lift)
 import Control.Applicative((<|>))
-import GHC.Generics
+import Data.IORef
+import AI.Datas
+import Control.Lens hiding ((.=))
+import Data.Aeson.Lens
+import Control.Monad
+import Mydefault
 
-data GPTConfig = GPTConfig
-    { api_key :: String
-    , base_url :: String
-    , manager_action :: IO H.Manager
-    } 
-instance Show GPTConfig where
-    show a = api_key a <> " " <> base_url a
 
-type GPT a = ReaderT GPTConfig (ExceptT [A.Value] IO) a
+type GPTError = [A.Value]
+type GPT a = ReaderT Config (ExceptT GPTError IO) a
 
+liftExceptT :: (ExceptT GPTError IO) a -> GPT a
 liftExceptT = lift
 
-runGPT :: GPT a -> GPTConfig -> IO (Either [A.Value] a)
+askConfig :: GPT Config
+askConfig = ask
+
+runGPT :: GPT a -> Config -> IO (Either [A.Value] a)
 runGPT readerBlock r = do
     let exceptBlock = runReaderT readerBlock r
     eitherResult <- runExceptT exceptBlock
@@ -35,41 +41,26 @@ runGPT readerBlock r = do
 
 gptRequest :: String -> GPT H.Request
 gptRequest restPath = do
-    config <- ask
+    config <- askConfig
+    let auth = ("Bearer " <>) $ fromString $ config ^. c_apiKey
     pure $ 
         H.setResponseTimeout 0 $
-        H.setHeader ("Authorization", "Bearer " <> fromString (api_key config)) $
-        fromString (base_url config <> restPath)
+        H.setHeader ("Authorization",  auth) $
+        fromString ((config ^. c_baseUrl) <> restPath)
 
-data Model = Model { _id :: Text
-    , created :: Integer
-    , object :: Text
-    , owned_by :: Text
-    } deriving (Show,Read)
-instance A.ToJSON Model where
-    toJSON model = A.object [ "id" A..= _id model
-        , "created" A..= created model
-        , "object" A..= object model
-        , "owned_by" A..= owned_by model
-        ]
-
-instance A.FromJSON Model where
-    parseJSON = A.withObject "Model" $ \v -> do
-        id' <- v A..: "id"
-        object' <- v A..: "object" 
-        created' <- v A..: "created"
-        owned_by' <- v A..: "owned_by"
-        pure $ Model { _id = id'
-            , created = created'
-            , object = object'
-            , owned_by = owned_by'
-            }
+aliRequest :: String -> GPT H.Request
+aliRequest restPath = do
+    config <- askConfig
+    let auth = ("Bearer " <>) $ fromString $ config ^. c_other . _Just . o_ali . _Just . _1 
+    let url = config ^. c_other . _Just . o_ali . _Just . _2
+    pure $ 
+        H.setResponseTimeout 0 $
+        H.setHeader ("Authorization",  auth) $
+        fromString (url <> restPath)
 
 
 
-
-
-transEither :: Monad m => Either String a ->  ExceptT [A.Value] m a
+transEither :: Monad m => Either String a ->  ExceptT GPTError m a
 transEither (Left str) = ExceptT $ pure $ Left [A.toJSON str]
 transEither (Right a) = ExceptT $ pure $ Right a
 
@@ -100,16 +91,8 @@ fromValue v = case A.fromJSON v of
 models :: GPT [Model]
 models = do
     req <- gptRequest "models"
-    config <- ask
-    value <- liftIO $ do
-        manager <- manager_action config
-        resp <- H.requestWith manager $
-            H.hUtf8json $
-            H.mget req
-        let either = A.eitherDecode $ H.responseBody resp
-        pure either
+    v <- myget req
     liftExceptT $ do
-        v <- transEither value
         data' <- get "data" v <|> putError v
         pure data'
 
@@ -118,83 +101,10 @@ models = do
 retrieveModel :: String ->  GPT Model
 retrieveModel modelId = do
     req <- gptRequest ("models/" <> fromString modelId)
-    config <- ask
-    value <- liftIO $ do
-        manager <- manager_action config
-        resp <- H.requestWith manager $
-            H.hUtf8json $
-            H.mget req
-        pure $ A.eitherDecode $ H.responseBody resp
+    v <- myget req 
     liftExceptT  $ do
-        v <- transEither value
         data' <- fromValue v <|> putError v
         pure data'
-
-
-data Role = User | Assistant | System | Custom Text deriving (Show,Read)
-roleText :: Role -> Text
-roleText User = "user"
-roleText Assistant = "assistant"
-roleText System = "system"
-roleText (Custom a) = a
-
-textRole :: Text -> Role
-textRole "user" = User
-textRole "assistant" = Assistant
-textRole "system" = System
-textRole a = Custom a
-
-data Message = Message (Role,Text) deriving (Show,Read)
-instance A.ToJSON Message where
-   toJSON (Message (role,content)) = A.object 
-        [ "role" A..= roleText role
-        , "content" A..= content
-        ]
-instance A.FromJSON Message where
-    parseJSON = A.withObject "Message" $ \v -> do
-        role <- v A..: "role"
-        content <- v A..: "content" 
-        pure $ Message (textRole role,content)
-
-myOptions n = A.defaultOptions { A.fieldLabelModifier = drop n, A.sumEncoding=A.UntaggedValue}
-data ChatObject = ChatObject { chat_id :: Text
-    , chat_object :: Text
-    , chat_created :: Integer
-    , chat_model :: Text
-    , chat_system_fingerprint :: Maybe Text
-    , chat_choices :: [ChatChoice]
-    , chat_usage :: ChatUsage
-    } deriving (Show,Read,Generic)
-
-instance A.ToJSON ChatObject where
-    toJSON = A.genericToJSON (myOptions 5)
-
-instance A.FromJSON ChatObject where
-    parseJSON = A.genericParseJSON (myOptions 5)
-
-data ChatChoice = ChatChoice { choice_index :: Int
-    , choice_message :: Message
-    } deriving (Show,Read,Generic)
-
-instance A.ToJSON ChatChoice where
-    toJSON = A.genericToJSON (myOptions 7)
-
-instance A.FromJSON ChatChoice where
-    parseJSON = A.genericParseJSON (myOptions 7)
-
-data ChatUsage = ChatUsage { usage_prompt_tokens :: Int
-    , usage_completion_tokens :: Int
-    , usage_total_tokens :: Int
-    } deriving  (Show,Read,Generic)
-
-instance A.ToJSON ChatUsage where
-    toJSON = A.genericToJSON (myOptions 6)
-
-instance A.FromJSON ChatUsage where
-    parseJSON = A.genericParseJSON (myOptions 6)
-
-unValue :: A.Value -> A.Object
-unValue (A.Object obj) = obj
 
 -- | chat/completions
 -- "gpt-3.5-turbo-16k-0613","gpt-3.5-turbo-0125","gpt-3.5-turbo","gpt-3.5-turbo-0613","gpt-3.5-turbo-0301","gpt-3.5-turbo-instruct-0914","gpt-3.5-turbo-instruct","tts-1-1106","text-embedding-ada-002","gpt-3.5-turbo-1106","gpt-3.5-turbo-16k
@@ -202,55 +112,189 @@ unValue (A.Object obj) = obj
 chatWith :: Text -> [Message] -> A.Value -> GPT ChatObject
 chatWith model messages options = do
     req <- gptRequest "chat/completions"
-    config <- ask
-    value <- liftIO $ do
-        manager <- manager_action config
-        resp <- H.requestWith manager $
-            H.withJson (A.Object (unValue json <> unValue options)) $ 
-            H.mpost req
-        let either = A.eitherDecode $ H.responseBody resp
-        pure either
+    v <- mypost req newOptions
     liftExceptT $ do
-        v <- transEither value
         data' <- fromValue  v <|> putError v
         pure data' 
     where json = A.object [ "model" A..= model
             , "messages" A..= messages
+            , "stream" A..= False
             ]
+          newOptions = json & _Object %~ (<> (options ^. _Object))
 
 -- | {"id":"chatcmpl-8zbuFTbty9eu3SuJb19gGSUxPqswD","object":"chat.completion.chunk","created":1709694411,"model":"gpt-35-turbo","choices":[{"finish_reason":null,"index":0,"delta":{"content":" today"},"content_filter_results":{"hate":{"filtered":false,"severity":"safe"},"self_harm":{"filtered":false,"severity":"safe"},"sexual":{"filtered":false,"severity":"safe"},"violence":{"filtered":false,"severity":"safe"}}}]}
-type Callback a = IO (Either String A.Value) -> IO a
+type Callback a = IO (Either B.ByteString ChunkModel) -> IO a
 chatStreamWith :: Text -> [Message] -> A.Value -> Callback a -> GPT a
 chatStreamWith model messages options callback = do
     req' <- gptRequest "chat/completions"
     let req = 
-            H.withJson (A.Object (unValue json <> unValue options)) $ 
+            H.withJson (json & _Object %~ (<> (options ^. _Object))) $ 
             H.mpost req'
-    config <- ask
+    config <- askConfig
     liftIO $ do
-        manager <- manager_action config
-        H.withResponse req manager f
+        manager <-  config ^. c_managerAction
+        H.withResponse req manager $ \ resp -> do
+            ref <- newIORef []
+            lastRef <- newIORef Nothing
+            f resp ref lastRef
     where json = A.object [ "model" A..= model
               , "messages" A..= messages
               , "stream" A..= True
               ]
-          f resp = callback r where
+          f resp ref lastRef = callback r where
               r = do
-                  let body = H.responseBody resp
-                  bs <- H.brRead body
-                  putStrLn "bs ======"
-                  B.putStrLn bs
-                  putStrLn "bs end======"
-                  let lines =
+                list <- readIORef ref
+                lastBs <- readIORef lastRef
+                if null list then do
+                    let body = H.responseBody resp
+                    bs <- H.brRead body
+                    let lines =
                           filter (not .B.null) $ 
                           B.lines bs
-                --   let objs = map trans lines
-                --   pure objs
-                  undefined
+                    let (nLs,objs) = go lines lastBs 0
+                    writeIORef ref objs
+                    -- putStrLn "======"
+                    -- forM_ lines B.putStrLn
+                    -- print nLs
+                    -- putStrLn "====end===="                    
+                    writeIORef lastRef nLs
+                    if B.null bs then 
+                        pure $ case lastBs of 
+                            Nothing -> Left ""
+                            Just bs -> trans bs
+                    else r 
+                else do
+                    let (x:xs) = list
+                    writeIORef ref xs
+                    pure x
+          go [] Nothing _ = (Nothing,[])
+          go [] (Just bs) _ = (Just bs,[])
+          go [x] (Just bs) 0 = go' (bs <> x) $ trans (bs <> x)
+          go [x] _ _ = go' x $ trans x
+          go (x:xs) (Just bs) 0 = (lastItem,trans (bs <>x):xs') where
+              (lastItem,xs') = go xs Nothing 1
+          go (x:xs) bsm n = (lastItem,trans x:xs') where
+              (lastItem,xs') = go xs bsm (n+1)
+          go' _ r@(Right _) = (Nothing,[r])
+          go' bs (Left _) = (Just bs,[])
+          
           trans bs | B.null bs = Left ""
                    | bs == "data: [DONE]" = Left ""
-                   | otherwise = A.eitherDecodeStrict $ B.drop 6 bs
-          printRequest req = do
-              putStrLn "print request"
-              print req
-              putStrLn "end"
+                   | otherwise = decodeEither bs
+          decodeEither :: B.ByteString -> Either B.ByteString ChunkModel
+          decodeEither bs = case A.eitherDecodeStrict (B.drop 6 bs) of
+              Right a -> Right a
+              Left _ -> Left bs
+
+
+defOption = A.object []
+
+chat :: Text -> [Message] -> GPT ChatObject
+chat model messages = chatWith model messages defOption
+
+chatStream :: Text -> [Message] -> Callback a -> GPT a
+chatStream model message callback = chatStreamWith model message defOption callback
+
+imageGenerate :: ImageBody -> GPT A.Value
+imageGenerate body = do
+    req <- gptRequest "images/generations"
+    mypost req body
+
+speechOption :: Text -> A.Value
+speechOption input = A.object
+    [ "model" A..= "tts-1-hd"
+    , "input" A..= input
+    , "voice" A..= "shimmer"
+    ]
+speech :: A.Value -> GPT L.ByteString
+speech option = do
+    req <- gptRequest "audio/speech"
+    config <- askConfig
+    liftIO $ do
+        manager <- config ^. c_managerAction
+        resp <- H.requestWith manager $
+            H.withJson option $ 
+            H.mpost req
+        pure $ H.responseBody resp
+
+qwenTurbo = "qwen-turbo" :: Text
+qwenVlPlus = "qwen-vl-plus" :: Text
+-- | 不同的模型有不同的参数格式
+-- qwen-turbo
+-- qwen-vl-plus
+aliChatWith :: Text -> [Message] -> A.Value -> GPT A.Value
+aliChatWith model messages options = do
+    req <- aliRequest url
+    mypost req newOptions
+    where newOptions = A.object [
+                "model" .= model ,
+                "input" .= A.object [
+                    "messages" .= messages 
+                ],
+                "parameters" .=   options <<>> A.object [
+                    "result_format" .= H.s "message"
+                ]
+            ]
+          url | model == qwenVlPlus = "services/aigc/multimodal-generation/generation"
+              | otherwise = "services/aigc/text-generation/generation"
+mypost :: (A.ToJSON a, A.FromJSON b) => H.Request -> a -> GPT b
+mypost req mydata = do
+    config <- askConfig
+    value <- liftIO $ do
+        manager <- config ^. c_managerAction
+        resp <- H.requestWith manager $
+            H.withJson mydata $ 
+            H.mpost req
+        let lazyStr = H.responseBody resp
+        -- L.putStrLn lazyStr
+        let either = A.eitherDecode lazyStr
+        pure either
+    liftExceptT $ transEither value
+
+myget :: (A.FromJSON b) => H.Request -> GPT b
+myget req = do
+    config <- askConfig
+    value <- liftIO $ do
+        manager <- config ^. c_managerAction
+        resp <- H.requestWith manager $
+            H.hUtf8json $
+            H.mget req
+        let lazyStr = H.responseBody resp
+        let either = A.eitherDecode lazyStr
+        pure either
+    liftExceptT $ transEither value
+createAliImageOptions :: Maybe Integer -> Text -> A.Value
+createAliImageOptions seed prompt = A.object [
+        "model" .= "wanx-v1" ,
+        "input" .= A.object [
+            "prompt" .= prompt ,
+            "negative_prompt" .= ""
+
+        ],
+        "parameters" .= A.object [
+            "style" .= "<flat illustration>",
+            "seed" .= seed,
+            "n" .= 1,
+            "size" .= "720*1280"
+        ]
+    ]
+
+-- | 文生图
+-- services/aigc/text2image/image-synthesis
+aliImageGenerate :: A.Value -> GPT A.Value
+aliImageGenerate options = do
+    baseReq <- aliRequest "services/aigc/text2image/image-synthesis"
+    let req = H.setHeader ("X-DashScope-Async","enable") baseReq
+    mypost req options
+
+aliTask :: String -> GPT A.Value
+aliTask taskId = do
+    req <- aliRequest $ "tasks/" ++ taskId
+    myget req
+
+-- | services/aigc/background-generation/generation/
+aliBackgroundGenerate :: A.Value -> GPT A.Value
+aliBackgroundGenerate options = do
+    baseReq <- aliRequest "services/aigc/background-generation/generation"
+    let req = H.setHeader ("X-DashScope-Async","enable") baseReq
+    mypost req options

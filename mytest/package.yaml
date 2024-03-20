@@ -1,6 +1,6 @@
-name:                myhdbc
+name:                mytest
 version:             0.1.0.0
-github:              "diqye/appm.git"
+github:              "diqye/my-haskell.git"
 license:             BSD3
 author:              "diqye"
 maintainer:          "diqye@foxmail.com"
@@ -24,7 +24,9 @@ description: Simple and free reqeust warped http-client
 dependencies:
 - base >= 4.7 && < 5
 - aeson
-- aeson-lens
+- text
+- bytestring
+- yaml
 
 library:
   source-dirs: src
@@ -39,7 +41,8 @@ executables:
    - -rtsopts
    - -with-rtsopts=-N
    dependencies:
-   - myhdbc
+   - mytest
+   - lens
 
 #
 # tests:

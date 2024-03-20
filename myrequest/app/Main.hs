@@ -5,6 +5,7 @@ import qualified Data.ByteString.Lazy as L
 import Data.List (intercalate)
 import Data.String (fromString)
 import HTTP.Myrequest
+import System.IO(readFile)
 import System.Environment (getEnv)
 
 test :: String
@@ -25,13 +26,12 @@ test = intercalate "\n"
 
 tts :: IO ()
 tts = do
-  key <- getEnv "API_KEY_DOUYU"
+  key <- getEnv "API_KEY"
+  msg <- readFile "text.txt"
   let myData = object
         [ "model" .= s "tts-1-hd"
-        , "input" .=
-          s
-            "从前，有一个小村庄，村庄里住着一只叫做小灰兔的可爱小兔子。小灰兔是村庄上最快乐的孩子，他总是笑嘻嘻地跑来跑去，喜欢和其他动物一起玩耍。一天，小灰兔遇到了一只迷路了的小松鼠，小松鼠哭着说找不到家了。小灰兔心生怜悯，便主动带着小松鼠找寻她的家。经过了一番冒险和困难，他们终于找到了小松鼠的家，小松鼠的爸爸妈妈十分感激小灰兔的帮助。从此，小灰兔和小松鼠成了最好的朋友，他们经常在森林里玩耍，分享彼此的快乐和悲伤。\n\n有一天，一只凶猛的狼出现在了村庄附近，它想要吃掉小灰兔和小松鼠。小灰兔和小松鼠吓得躲在角落里颤抖，但突然，所有村庄的动物们团结起来，一起对抗凶狼。他们联合起来，发挥各自的特长，最终成功地把狼赶跑了。\n\n在那之后，小灰兔和小松鼠明白到，只有团结合作才能战胜困难。他们明白了友谊的真正含义，从此过着快乐和和谐的生活。村庄里的每个动物都变得更加团结、友爱，一起努力打造一个更美好的家园。\n\n这个故事告诉我们，团结合作和友谊是非常重要的。当我们面对困难时，只要伸出援手，互相帮助，就一定能够战胜困难，创造美好的未来。希望你也能像小灰兔和小松鼠一样，珍惜友谊，勇敢面对困难，做一个勇敢、善良的小朋友。安安稳稳地入睡吧，晚安！愿你做一个勇敢善良的小孩，梦里的世界充满温暖和爱意。"
-        , "voice" .= s "nova"
+        , "input" .= msg
+        , "voice" .= s "onyx"
         , "speed" .= n 1
         ]
   setting <- newManagerWithSocksProxy ("127.0.0.1", 7890)

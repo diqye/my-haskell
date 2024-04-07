@@ -58,6 +58,8 @@ module HTTP.Myrequest
   , setProxy
   , setResponseTimeout
   , dotJson
+  , setRequestBodyBS
+  , setRequestBodyForm
   , s
   , n
   ) where
@@ -76,7 +78,7 @@ import qualified Network.Connection as NC
 import qualified Network.Socket as NS
 import qualified Network.HTTP.Client.Internal as HTTPI
 import Data.String(fromString)
-
+import Network.HTTP.Types.URI (renderQuery)
 
 
 mmethod :: Method.Method -> HTTP.Request -> HTTP.Request
@@ -119,6 +121,16 @@ hAuthorization auth = setHeader (Header.hAuthorization,auth)
 
 bjson :: A.ToJSON a => a -> HTTP.Request -> HTTP.Request
 bjson value req = req {HTTP.requestBody = HTTP.RequestBodyLBS $ A.encode value}
+
+setRequestBodyBS :: B.ByteString -> HTTP.Request -> HTTP.Request
+setRequestBodyBS bs req = req {
+  HTTP.requestBody = HTTP.RequestBodyBS bs
+}
+
+setRequestBodyForm :: [(B.ByteString,Maybe B.ByteString)] -> HTTP.Request -> HTTP.Request
+setRequestBodyForm item = setRequestBodyBS  (renderQuery False item) .
+  setHeader (Header.hContentType,"application/x-www-form-urlencoded")
+
 
 withJson :: A.ToJSON a => a -> HTTP.Request -> HTTP.Request
 withJson a = bjson a . hUtf8json

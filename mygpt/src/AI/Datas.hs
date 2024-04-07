@@ -9,6 +9,7 @@ import Data.Aeson
 import Data.List(intercalate)
 import Data.Default.Class
 import GHC.Generics
+import Data.ByteString.Lazy(ByteString)
 import Control.Applicative(empty)
 
 createMyOptions :: Int -> Options
@@ -24,7 +25,9 @@ trancateOptions = defaultOptions {
 }
 data OtherConfig = OtherConfig {
     -- (key,url)
-    _o_ali :: Maybe (String,String)
+    _o_ali :: Maybe (String,String) ,
+    -- (key,url,groupid)
+    _o_minimax :: Maybe (String,String,String)
 } deriving Show
 
 makeLenses ''OtherConfig
@@ -33,7 +36,8 @@ data Config = Config {
     _c_apiKey :: String ,
     _c_baseUrl :: String ,
     _c_managerAction :: IO H.Manager ,
-    _c_other :: Maybe OtherConfig
+    _c_other :: Maybe OtherConfig,
+    _c_logHandle :: (H.Request,H.Response ByteString) -> IO ()
 }
 
 makeLenses ''Config
@@ -46,14 +50,15 @@ instance Show Config where
         outputs = [
                 "apiKey=" <> apiKey,
                 "baseUrl=" <> baseUrl,
-                "ohter.ali=" <> show other
+                "ohter=" <> show other
             ]
 instance Default Config where
     def = Config {
         _c_apiKey = "",
         _c_baseUrl = "https://api.openai.com/v1/",
         _c_managerAction = H.newTlsManager ,
-        _c_other = Nothing
+        _c_other = Nothing,
+        _c_logHandle = \ _ -> pure ()
     }
 
 data Model = Model { 
@@ -105,8 +110,7 @@ data Message = MsgUser {
 } | MsgAssistant {
     _msg'role :: MessageRoleAssistant ,
     _msg'name :: Maybe Text ,
-    _msg'content :: Text ,
-    _msg'tool_calls :: Maybe [Value]
+    _msg'content :: Text 
 } | MsgSystem {
     _sys'role :: MessageRoleSystem ,
     _sys'name :: Maybe Text ,
@@ -114,7 +118,8 @@ data Message = MsgUser {
 } | MsgTool {
     _tool'role :: MessageRoleTool ,
     _tool'content :: Text ,
-    _tool'call_id :: Text
+    _tool'tool_call_id :: Text ,
+    _tool'name :: Text
 } | MsgCustom Value deriving (Show,Read,Generic)
 
 makeLenses ''Message
@@ -165,8 +170,7 @@ assistant :: Text -> Message
 assistant content = MsgAssistant {
     _msg'role = MessageRoleAssistant ,
     _msg'name = Nothing ,
-    _msg'content = content ,
-    _msg'tool_calls = Nothing
+    _msg'content = content 
 }
 system :: Text -> Message 
 system content = MsgSystem {

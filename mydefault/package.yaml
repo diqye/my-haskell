@@ -38,6 +38,7 @@ ghc-options:
 - -fno-warn-unused-imports
 - -XExtendedDefaultRules
 - -XOverloadedStrings
+- -XFlexibleContexts
 
 
 library:

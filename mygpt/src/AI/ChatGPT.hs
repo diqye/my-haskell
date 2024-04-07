@@ -58,11 +58,32 @@ aliRequest restPath = do
         H.setHeader ("Authorization",  auth) $
         fromString (url <> restPath)
 
+minimaxRequest :: String -> GPT H.Request
+minimaxRequest path = do
+    config <- askConfig
+    let (auth,url,groupid) = config ^. c_other . _Just . o_minimax . _Just
+    pure $
+        H.setResponseTimeout 0 $
+        H.setHeader ("Content-Type", "application/json") $
+        H.setHeader ("Authorization", "Bearer " <> fromString auth) $
+        H.setQueryString [("GroupId", Just $ fromString groupid)] $
+        fromString $ url <> path
 
+
+minimaxT2A :: A.Value -> GPT A.Value
+minimaxT2A options = do
+    req <- minimaxRequest "t2a_pro"
+    result <- mypost req options
+    let statusCode = result ^? key "base_resp" . key "status_code" . _JSON'
+    if statusCode == Just 0 then pure result else do
+        liftExceptT $ throwE [result]
 
 transEither :: Monad m => Either String a ->  ExceptT GPTError m a
 transEither (Left str) = ExceptT $ pure $ Left [A.toJSON str]
 transEither (Right a) = ExceptT $ pure $ Right a
+
+
+
 
 getField key v = A.parseEither id $ A.withObject "Object" parse v where 
     parse obj = obj A..: key
@@ -72,6 +93,7 @@ putError :: Monad m => A.Value -> ExceptT [A.Value] m a
 putError v = do
     err <- get "error" v
     ExceptT $ pure $ Left [err]
+
 
 fromValue :: (A.FromJSON a,Monad m) => A.Value -> ExceptT [A.Value] m a
 fromValue v = case A.fromJSON v of 
@@ -120,7 +142,7 @@ chatWith model messages options = do
             , "messages" A..= messages
             , "stream" A..= False
             ]
-          newOptions = json & _Object %~ (<> (options ^. _Object))
+          newOptions = options <<>> json
 
 -- | {"id":"chatcmpl-8zbuFTbty9eu3SuJb19gGSUxPqswD","object":"chat.completion.chunk","created":1709694411,"model":"gpt-35-turbo","choices":[{"finish_reason":null,"index":0,"delta":{"content":" today"},"content_filter_results":{"hate":{"filtered":false,"severity":"safe"},"self_harm":{"filtered":false,"severity":"safe"},"sexual":{"filtered":false,"severity":"safe"},"violence":{"filtered":false,"severity":"safe"}}}]}
 type Callback a = IO (Either B.ByteString ChunkModel) -> IO a
@@ -198,7 +220,10 @@ chatStream model message callback = chatStreamWith model message defOption callb
 imageGenerate :: ImageBody -> GPT A.Value
 imageGenerate body = do
     req <- gptRequest "images/generations"
-    mypost req body
+    v <- mypost req body
+    let maybeData = v ^? key "data"
+    maybe (throw' [v]) (const $ pure v) maybeData
+    where throw' v = liftExceptT $ throwE v
 
 speechOption :: Text -> A.Value
 speechOption input = A.object
@@ -242,9 +267,9 @@ mypost req mydata = do
     config <- askConfig
     value <- liftIO $ do
         manager <- config ^. c_managerAction
-        resp <- H.requestWith manager $
-            H.withJson mydata $ 
-            H.mpost req
+        let req' = H.withJson mydata $ H.mpost req
+        resp <- H.requestWith manager req'
+        config ^. c_logHandle $ (req',resp)
         let lazyStr = H.responseBody resp
         -- L.putStrLn lazyStr
         let either = A.eitherDecode lazyStr
@@ -256,9 +281,9 @@ myget req = do
     config <- askConfig
     value <- liftIO $ do
         manager <- config ^. c_managerAction
-        resp <- H.requestWith manager $
-            H.hUtf8json $
-            H.mget req
+        let req' = H.hUtf8json $ H.mget req
+        resp <- H.requestWith manager req'
+        config ^. c_logHandle $ (req',resp)
         let lazyStr = H.responseBody resp
         let either = A.eitherDecode lazyStr
         pure either
@@ -285,7 +310,10 @@ aliImageGenerate :: A.Value -> GPT A.Value
 aliImageGenerate options = do
     baseReq <- aliRequest "services/aigc/text2image/image-synthesis"
     let req = H.setHeader ("X-DashScope-Async","enable") baseReq
-    mypost req options
+    v <- mypost req options
+    let taskStatus = v ^? key "output" . key "task_status"
+    maybe (throw' [v]) (const $ pure v) taskStatus
+    where throw' v = liftExceptT $ throwE v
 
 aliTask :: String -> GPT A.Value
 aliTask taskId = do
@@ -296,5 +324,17 @@ aliTask taskId = do
 aliBackgroundGenerate :: A.Value -> GPT A.Value
 aliBackgroundGenerate options = do
     baseReq <- aliRequest "services/aigc/background-generation/generation"
+    let req = H.setHeader ("X-DashScope-Async","enable") baseReq
+    mypost req options
+
+aliSemantic :: A.Value -> GPT A.Value
+aliSemantic options = do
+    baseReq <- aliRequest "services/aigc/wordart/semantic"
+    let req = H.setHeader ("X-DashScope-Async","enable") baseReq
+    mypost req options
+
+aliTexture :: A.Value -> GPT A.Value 
+aliTexture options = do
+    baseReq <- aliRequest "services/aigc/wordart/texture"
     let req = H.setHeader ("X-DashScope-Async","enable") baseReq
     mypost req options

@@ -36,16 +36,16 @@ library:
   source-dirs: src
 
 #
-executables:
- myrequest-exe:
-   main:                Main.hs
-   source-dirs:         app
-   ghc-options:
-   - -threaded
-   - -rtsopts
-   - -with-rtsopts=-N
-   dependencies:
-   - myrequest
+# executables:
+#  myrequest-exe:
+#    main:                Main.hs
+#    source-dirs:         app
+#    ghc-options:
+#    - -threaded
+#    - -rtsopts
+#    - -with-rtsopts=-N
+#    dependencies:
+#    - myrequest
 
 #
 # tests:

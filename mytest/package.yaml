@@ -27,13 +27,16 @@ dependencies:
 - text
 - bytestring
 - yaml
+- mtl
+- transformers
+- lens
 
 library:
   source-dirs: src
 
 #
 executables:
- myhdbc-exe:
+ exe:
    main:                Main.hs
    source-dirs:         app
    ghc-options:
@@ -42,7 +45,6 @@ executables:
    - -with-rtsopts=-N
    dependencies:
    - mytest
-   - lens
 
 #
 # tests:

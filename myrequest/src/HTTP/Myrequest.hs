@@ -39,6 +39,7 @@
 module HTTP.Myrequest
   ( module HTTP
   , module HTTPS
+  , module T
   , mmethod
   , mpost
   , mget
@@ -47,7 +48,6 @@ module HTTP.Myrequest
   , mdelete
   , setHeader
   , hUtf8json
-  , hAuthorization
   , bjson
   , withJson
   , putFormData
@@ -58,6 +58,7 @@ module HTTP.Myrequest
   , setProxy
   , setResponseTimeout
   , dotJson
+  , parse
   , setRequestBodyBS
   , setRequestBodyForm
   , s
@@ -69,7 +70,7 @@ import Network.HTTP.Client.TLS as HTTPS
 import qualified Network.HTTP.Types.Method as Method --http-types
 import qualified Data.Aeson as A
 import qualified Network.HTTP.Types.Header as Header
-import qualified Network.HTTP.Types as T
+import Network.HTTP.Types as T
 import Control.Monad.IO.Class(liftIO,MonadIO)
 import Data.ByteString.Lazy
 import qualified Data.ByteString as B
@@ -115,6 +116,7 @@ setProxy hostname port req= req {HTTP.proxy = Just (HTTP.Proxy hostname port)}
 
 
 
+
 hUtf8json = setHeader (Header.hContentType,"application/json; charset=utf-8")
 
 hAuthorization auth = setHeader (Header.hAuthorization,auth)
@@ -139,6 +141,9 @@ withJson a = bjson a . hUtf8json
 -- > req <- withFormData [partBS "prompt" "A cute baby sea otter wearing a beret", partFileSource "image" "otter.png"] request
 putFormData :: MonadIO m => [HTTP.Part] -> HTTP.Request -> m  HTTP.Request
 putFormData parts req = HTTP.formDataBody parts req
+
+parse :: String -> HTTP.Request
+parse url = setResponseTimeout 0 $ fromString url
 
 setResponseTimeout :: Int -> HTTP.Request -> HTTP.Request
 setResponseTimeout micro req | micro == 0 = req {HTTP.responseTimeout = HTTP.responseTimeoutNone}

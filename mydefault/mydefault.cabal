@@ -28,7 +28,7 @@ library
       Paths_mydefault
   hs-source-dirs:
       src
-  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings
+  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings -XFlexibleContexts -XConstraintKinds
   build-depends:
       aeson
     , base >=4.7 && <5

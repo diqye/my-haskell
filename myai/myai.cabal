@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           mytest
+name:           myai
 version:        0.1.0.0
 synopsis:       HDBC version of MonadTrnas
 description:    Simple and free reqeust warped http-client
@@ -22,36 +22,49 @@ source-repository head
   location: https://github.com/diqye/my-haskell.git
 
 library
+  exposed-modules:
+      Myai
   other-modules:
-      Paths_mytest
+      Paths_myai
   hs-source-dirs:
       src
+  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings -XFlexibleContexts -XConstraintKinds -XScopedTypeVariables
   build-depends:
       aeson
     , base >=4.7 && <5
     , bytestring
+    , data-default-class
     , lens
+    , lens-aeson
     , mtl
+    , mydefault
+    , myrequest
+    , string-conversions
     , text
     , transformers
-    , yaml
+    , unordered-containers
   default-language: Haskell2010
 
-executable exe
+executable mygpt-exe
   main-is: Main.hs
   other-modules:
-      Paths_mytest
+      Paths_myai
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings -XFlexibleContexts -XConstraintKinds -XScopedTypeVariables -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       aeson
     , base >=4.7 && <5
     , bytestring
+    , data-default-class
     , lens
+    , lens-aeson
     , mtl
-    , mytest
+    , myai
+    , mydefault
+    , myrequest
+    , string-conversions
     , text
     , transformers
-    , yaml
+    , unordered-containers
   default-language: Haskell2010

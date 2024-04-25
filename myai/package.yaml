@@ -1,4 +1,4 @@
-name:                mydefault
+name:                myai
 version:             0.1.0.0
 github:              "diqye/my-haskell.git"
 license:             BSD3
@@ -23,9 +23,18 @@ description: Simple and free reqeust warped http-client
 
 dependencies:
 - base >= 4.7 && < 5
+- myrequest
+- mydefault
+- transformers
+- mtl
+- data-default-class
+- bytestring
+- text
+- unordered-containers
 - lens
 - aeson
 - lens-aeson
+- string-conversions
 
 ghc-options:
 - -Wall
@@ -40,14 +49,15 @@ ghc-options:
 - -XOverloadedStrings
 - -XFlexibleContexts
 - -XConstraintKinds
+- -XScopedTypeVariables
 
 
 library:
   source-dirs: src
 
-#
+
 # executables:
-#  myhdbc-exe:
+#  mygpt-exe:
 #    main:                Main.hs
 #    source-dirs:         app
 #    ghc-options:
@@ -55,8 +65,8 @@ library:
 #    - -rtsopts
 #    - -with-rtsopts=-N
 #    dependencies:
-#    - mydefault
-#    - raw-strings-qq
+#    - myai
+  #  - raw-strings-qq
 
 #
 # tests:

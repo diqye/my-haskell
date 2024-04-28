@@ -86,21 +86,21 @@ runEnvAIT mAI = do
 useConfig :: MonadAIReader m => m AIConfig
 useConfig = ask
 
-use' :: MonadAIReader m => Getting a AIConfig a ->  m a
-use' getting = do 
+use'conf :: MonadAIReader m => Getting a AIConfig a ->  m a
+use'conf getting = do 
     config <- useConfig
     pure $ config ^. getting
 
 useGPTRequest :: MonadAIReader m => String -> m H.Request 
 useGPTRequest restPath = do
-    style <- use' gptStyle
+    style <- use'conf gptStyle
     pure $
         H.setHeader ("Authorization", cs $ _apiKey style) $
         H.parse $ _baseURL style <> restPath
 
 useAliRequest :: MonadAIReader m => String -> m H.Request
 useAliRequest restPath = do
-    (url,key) <- use' ali
+    (url,key) <- use'conf ali
     pure $
         H.setHeader ("Authorization", cs key) $
         H.parse $ url <> restPath
@@ -116,7 +116,7 @@ eitherTransString a = mapLeft  (First . Just . A.toJSON) a
 
 useGET :: (MonadAI m, A.FromJSON a, MonadIO m) => H.Request -> m a
 useGET request = do
-    mgrIO <- use' manager
+    mgrIO <- use'conf manager
     eitherV <- liftIO $ do
         mgr <-  mgrIO
         resp <- H.requestWith mgr $ H.mget request
@@ -129,7 +129,7 @@ useGET request = do
 
 usePOST :: (A.ToJSON d, MonadAI m, A.FromJSON a, MonadIO m) => d -> H.Request -> m a
 usePOST mydata request = do
-    mgrIO <- use' manager
+    mgrIO <- use'conf manager
     eitherV <- liftIO $ do
         mgr <-  mgrIO
         resp <- H.requestWith mgr $ 
@@ -147,7 +147,7 @@ type MonadStream a = ContT a (ReaderT ResponseStream  (ExceptT AIError IO)) a
 useStream :: (MonadAI m, A.ToJSON d, MonadIO m) 
     => d -> H.Request -> MonadStream a -> m a
 useStream mydata request mb = do
-    mgrIO <- use' manager
+    mgrIO <- use'conf manager
     eitherV <- liftIO $ do
         mgr <-  mgrIO
         let req = H.withJson (A.toJSON mydata <<>> A.object ["stream" <-- True]) $ H.mpost request

@@ -45,7 +45,6 @@ ghc-options:
 library:
   source-dirs: src
 
-#
 # executables:
 #  myhdbc-exe:
 #    main:                Main.hs
@@ -56,7 +55,7 @@ library:
 #    - -with-rtsopts=-N
 #    dependencies:
 #    - mydefault
-#    - raw-strings-qq
+#    - QuickCheck
 
 #
 # tests:

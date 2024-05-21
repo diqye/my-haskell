@@ -7,7 +7,7 @@ cabal-version: 1.12
 name:           myai
 version:        0.1.0.0
 synopsis:       HDBC version of MonadTrnas
-description:    Simple and free reqeust warped http-client
+description:    Azure and gpt style AI
 category:       HTTP
 homepage:       https://github.com/diqye/my-haskell.git#readme
 bug-reports:    https://github.com/diqye/my-haskell.git/issues
@@ -24,13 +24,17 @@ source-repository head
 library
   exposed-modules:
       Myai
+      Myai.Data.Azure
+      Myai.Data.Config
+      Myai.Data.GPT
   other-modules:
       Paths_myai
   hs-source-dirs:
       src
   ghc-options: -Wall -fno-warn-missing-signatures -fno-warn-type-defaults -fno-warn-name-shadowing -fno-warn-orphans -fno-warn-incomplete-uni-patterns -fno-warn-unused-top-binds -fno-warn-unused-imports -XExtendedDefaultRules -XOverloadedStrings -XFlexibleContexts -XConstraintKinds -XScopedTypeVariables
   build-depends:
-      aeson
+      QuasiText
+    , aeson
     , base >=4.7 && <5
     , bytestring
     , data-default-class

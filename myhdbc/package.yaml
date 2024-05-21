@@ -24,7 +24,6 @@ description: Simple and free reqeust warped http-client
 dependencies:
 - base >= 4.7 && < 5
 - aeson
-- aeson-lens
 
 library:
   source-dirs: src

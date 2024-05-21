@@ -40,8 +40,11 @@ data AIConfigGPTStyle = AIConfigGPTStyle {
 data AIConfig = AIConfig {
     _gptStyle :: AIConfigGPTStyle ,
     _manager :: IO H.Manager ,
+    -- (key,url)
     _ali :: (String,String) ,
-    _minimax :: (String,String,String)
+    _minimax :: (String,String,String),
+    -- (key,url)
+    _microsoft :: (String,String)
 }
 
 makeLenses ''AIConfigGPTStyle
@@ -54,7 +57,8 @@ instance Default AIConfig where
         } ,
         _manager = H.newTlsManager ,
         _ali = def ,
-        _minimax = def
+        _minimax = def,
+        _microsoft = def
     }
 
 makeLenses ''AIConfig
@@ -76,11 +80,16 @@ runEnvAIT mAI = do
         key <- getEnv "GPT_KEY"
         url <- getEnv "GPT_BASE_URL"
         pure (key,url)
+    micr <- liftIO $ do
+        key <- getEnv "MICROSOFT_KEY"
+        url <- getEnv "MICROSOFT_URL"
+        pure (key,url)
     runAIT mAI $ def {
         _gptStyle = AIConfigGPTStyle {
             _apiKey = key ,
             _baseURL = url
-        }
+        },
+        _microsoft = micr
     }
 
 useConfig :: MonadAIReader m => m AIConfig
@@ -95,12 +104,12 @@ useGPTRequest :: MonadAIReader m => String -> m H.Request
 useGPTRequest restPath = do
     style <- use'conf gptStyle
     pure $
-        H.setHeader ("Authorization", cs $ _apiKey style) $
+        H.setHeader ("Authorization", cs $ "Bearer " <>  _apiKey style) $
         H.parse $ _baseURL style <> restPath
 
 useAliRequest :: MonadAIReader m => String -> m H.Request
 useAliRequest restPath = do
-    (url,key) <- use'conf ali
+    (key,url) <- use'conf ali
     pure $
         H.setHeader ("Authorization", cs key) $
         H.parse $ url <> restPath
@@ -112,7 +121,6 @@ mapLeft _ (Right b) = Right b
 
 eitherTransString :: Either String b -> Either AIError b
 eitherTransString a = mapLeft  (First . Just . A.toJSON) a
-
 
 useGET :: (MonadAI m, A.FromJSON a, MonadIO m) => H.Request -> m a
 useGET request = do
@@ -142,6 +150,23 @@ usePOST mydata request = do
         else pure $ Left (show resp)
     liftEither $ eitherTransString $ eitherV
 
+useMicrosoftSpeech :: (MonadAI m,MonadIO m) => ByteString -> m L.ByteString
+useMicrosoftSpeech  xml = do
+    (key,url) <- use'conf microsoft
+    mgrIO <- use'conf manager
+    mgr <- liftIO mgrIO
+    -- liftIO $ B.putStrLn xml
+    resp <- H.requestWith mgr $
+        H.setRequestBodyBS xml $
+        H.setHeader ("Ocp-Apim-Subscription-Key",cs $ key) $
+        H.setHeader ("Content-Type","application/ssml+xml") $
+        H.setHeader ("X-Microsoft-OutputFormat","audio-16khz-32kbitrate-mono-mp3") $
+        H.setHeader ("User-Agent","Haskell") $
+        H.mpost $
+        H.parse url
+    let status@(H.Status code msg) = H.responseStatus resp
+    when (not $ H.statusIsSuccessful $ status) $ throwError $ First $ Just $ A.toJSON $ (code,(cs msg :: String))
+    pure $ H.responseBody resp
 type ResponseStream = H.Response H.BodyReader
 type MonadStream a = ContT a (ReaderT ResponseStream  (ExceptT AIError IO)) a
 useStream :: (MonadAI m, A.ToJSON d, MonadIO m) 
@@ -160,6 +185,12 @@ createLabel a = callCC $ \ exit -> do
     let go b = exit (go,b)
     pure (go,a)
 
+fixData :: ByteString -> ByteString
+fixData bs
+    | B.take 5 bs == "data:" = B.drop 5 bs
+    | otherwise = bs
+
+
 -- | 解析 sse数据 :data xxxx 一次chunk中可能是多行，最后一行可能是不全的JSON数据，
 -- 多次读取下,要分析和拼接不全的数据。
 recurValues :: (MonadReader ResponseStream m, MonadAIError m,MonadIO m) => a -> ContT r m (a -> ContT r m (), [A.Value],a)
@@ -167,12 +198,12 @@ recurValues a = do
     br <- lift $ fmap H.responseBody ask
     (recur, (lastBs,a)) <- createLabel ("",a)
     bs' <- liftIO $ H.brRead br
-    -- liftIO $ B.putStrLn bs'
-    when (not (B.null bs') && B.take 5 bs' /= "data:") $ do
-        let maybeV = A.decodeStrict bs'
-        lift $ throwError $ maybe (First $ Just $ A.String $ cs $ bs') (First . Just) maybeV
+    -- liftIO $ B.putStrLn $  "My diqye = " <> bs'
+    -- when (not (B.null bs') && B.take 5 bs' /= "data:") $ do
+    --     let maybeV = A.decodeStrict bs'
+    --     lift $ throwError $ maybe (First $ Just $ A.String $ cs $ bs') (First . Just) maybeV
 
-    let lines = fmap (B.drop 6) (B.lines bs') & ix 0 %~ (lastBs <>)
+    let lines = fmap fixData (B.lines bs') & ix 0 %~ (lastBs <>)
     let maybeValues = fmap A.decodeStrict lines
     let maybeToBool = maybe False (const True)
     let values = do {

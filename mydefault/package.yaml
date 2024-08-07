@@ -45,18 +45,17 @@ ghc-options:
 library:
   source-dirs: src
 
-#
-# executables:
-#  myhdbc-exe:
-#    main:                Main.hs
-#    source-dirs:         app
-#    ghc-options:
-#    - -threaded
-#    - -rtsopts
-#    - -with-rtsopts=-N
-#    dependencies:
-#    - mydefault
-#    - raw-strings-qq
+executables:
+ myhdbc-exe:
+   main:                Main.hs
+   source-dirs:         app
+   ghc-options:
+   - -threaded
+   - -rtsopts
+   - -with-rtsopts=-N
+   dependencies:
+   - mydefault
+   - QuickCheck
 
 #
 # tests:

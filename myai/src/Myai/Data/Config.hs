@@ -5,8 +5,8 @@ import qualified Myai.Data.GPT as G
 import qualified Myai.Data.Azure as Az
 import Control.Monad.Reader ( MonadReader )
 
-import Data.Monoid ( First )
-import Data.Aeson ( Value ) 
+import Data.Monoid ( First (First) )
+import Data.Aeson ( Value, ToJSON (toJSON) ) 
 import HTTP.Myrequest ( newTlsManager, Manager )
 import Data.Default.Class ( Default(..) )
 import Control.Monad.Except ( MonadError )
@@ -42,3 +42,6 @@ type Error = First Value
 type MonadAIReader m = MonadReader Config m
 type MonadAIError m = MonadError Error m
 type MonadAI m = (Alternative m, MonadAIReader m, MonadAIError m)
+
+createError :: ToJSON a => a -> Error
+createError = First . Just . toJSON

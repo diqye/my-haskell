@@ -1,7 +1,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Myai where
 
-import Myai.Data.Config ( Config (Config, _gpt, _azure), MonadAIReader, Error, MonadAI, manager, MonadAIError )
+import Myai.Data.Config ( Config (Config, _gpt, _azure), MonadAIReader, Error, MonadAI, manager, MonadAIError, createError )
 import Text.QuasiText ( embed )
 import Data.String.Conversions (cs)
 import Control.Monad.Reader (ReaderT, runReaderT, MonadReader (ask), asks)
@@ -17,7 +17,7 @@ import HTTP.Myrequest
       mpost,
       parse,
       setHeader,
-      withJson, setResponseTimeout )
+      withJson, setResponseTimeout, HttpException (HttpExceptionRequest) )
 import Control.Lens ((^.), (&), ix, (%~))
 import Control.Monad.Cont
     ( MonadIO(..), MonadTrans(lift), ContT, MonadCont(..) )
@@ -30,6 +30,7 @@ import Data.Maybe (maybeToList, isJust)
 import Control.Monad (when)
 import Data.Monoid (First(First))
 import Data.Text (Text)
+import Control.Exception (catch, Exception (displayException), SomeException (SomeException))
 
 
 runAIT ::  Config -> ReaderT Config (ExceptT Error m) a ->  m (Either Error a)
@@ -67,7 +68,14 @@ useStream mydata request mb = do
     eitherV <- liftIO $ do
         mgr <-  mgrIO
         let req = withJson mydata $ mpost request
-        withResponse req mgr $ \x -> (runExceptT  . flip runReaderT x . evalContT) mb
+        let myerror :: HttpException -> IO (Either Error a)
+            myerror (HttpExceptionRequest _ content) = pure $ Left $ createError $ show content
+            myerror e = pure $ Left $ createError $ show e
+        let myerror2 :: SomeException -> IO (Either Error a)
+            myerror2 = pure . Left . createError . ("diqye" <>) . show
+        withResponse req mgr (\x -> (runExceptT  . flip runReaderT x . evalContT) mb)
+            `catch` myerror
+            `catch` myerror2
     liftEither  eitherV
 
 -- | 无限 recur
@@ -116,7 +124,7 @@ recurValue a = do
     if null xs' then do
         let fn _ = pure ()
         pure (fn,Null,a2)
-    else do 
+    else do
         let (x:xs) = xs'
         let fn a | null xs = do
                 recur a

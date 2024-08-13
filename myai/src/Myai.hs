@@ -4,7 +4,7 @@ module Myai where
 import Myai.Data.Config ( Config (Config, _gpt, _azure), MonadAIReader, Error, MonadAI, manager, MonadAIError, createError )
 import Text.QuasiText ( embed )
 import Data.String.Conversions (cs)
-import Control.Monad.Reader (ReaderT, runReaderT, MonadReader (ask), asks)
+import Control.Monad.Reader (ReaderT, runReaderT, MonadReader (ask), asks, unless)
 import Control.Monad.Except (ExceptT, runExceptT, liftEither,throwError, MonadError (throwError))
 import qualified Myai.Data.GPT as G
 import qualified Myai.Data.Azure as A
@@ -18,7 +18,7 @@ import HTTP.Myrequest
       parse,
       setHeader,
       withJson, setResponseTimeout, HttpException (HttpExceptionRequest) )
-import Control.Lens ((^.), (&), ix, (%~))
+import Control.Lens ((^.), (&), ix, (%~), (^?))
 import Control.Monad.Cont
     ( MonadIO(..), MonadTrans(lift), ContT, MonadCont(..) )
 import Data.Aeson ( Value (Null), decodeStrict, ToJSON(toJSON) )
@@ -31,6 +31,7 @@ import Control.Monad (when)
 import Data.Monoid (First(First))
 import Data.Text (Text)
 import Control.Exception (catch, Exception (displayException), SomeException (SomeException))
+import Data.Aeson.Lens (key)
 
 
 runAIT ::  Config -> ReaderT Config (ExceptT Error m) a ->  m (Either Error a)
@@ -115,6 +116,10 @@ recurValues a = do
     -- when (not (B.null bs') && null values) $ do
     --     lift $ throwError $ First $ Just $ toJSON  (cs bs' :: Text)
     when (null values) $ recur' a
+    unless (null values) $ do
+        let v = head values
+        let a = v ^? key "error"
+        when (isJust a) $ lift $ liftEither $ Left $ createError a
     pure (recur',values,a)
 -- | 一次提取一个Value
 recurValue ::  (MonadReader ResponseStream m, MonadAIError m,MonadIO m) => a -> ContT r m (a -> ContT r m (), Value,a)

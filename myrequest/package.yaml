@@ -29,8 +29,8 @@ dependencies:
 - http-types
 - http-client
 - data-default-class
-- connection
 - network
+- crypton-connection
 
 library:
   source-dirs: src

@@ -19,7 +19,7 @@ extra-source-files: []
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description: Simple and free reqeust warped http-client
+description: My default functions implemention
 
 dependencies:
 - base >= 4.7 && < 5
@@ -58,13 +58,15 @@ library:
 #    - QuickCheck
 
 #
-# tests:
-#   appm-test:
-#     main:                Spec.hs
-#     source-dirs:         test
-#     ghc-options:
-#     - -threaded
-#     - -rtsopts
-#     - -with-rtsopts=-N
-#     dependencies:
-#     - appm
+tests:
+  mydefault-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - QuickCheck
+    - mydefault
+    - text

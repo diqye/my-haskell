@@ -32,7 +32,7 @@ library
       aeson
     , base >=4.7 && <5
     , bytestring
-    , connection
+    , crypton-connection
     , data-default-class
     , http-client
     , http-client-tls

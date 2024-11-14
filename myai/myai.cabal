@@ -27,6 +27,7 @@ library
       Myai.Data.Azure
       Myai.Data.Config
       Myai.Data.GPT
+      Myai.Data.Ollama
   other-modules:
       Paths_myai
   hs-source-dirs:

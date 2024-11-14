@@ -1,38 +1,30 @@
 {-# LANGUAGE QuasiQuotes #-}
 module Myai where
 
-import Myai.Data.Config ( Config (Config, _gpt, _azure), MonadAIReader, Error, MonadAI, manager, MonadAIError, createError )
-import Text.QuasiText ( embed )
-import Data.String.Conversions (cs)
-import Control.Monad.Reader (ReaderT, runReaderT, MonadReader (ask), asks, unless)
-import Control.Monad.Except (ExceptT, runExceptT, liftEither,throwError, MonadError (throwError))
-import qualified Myai.Data.GPT as G
-import qualified Myai.Data.Azure as A
-import HTTP.Myrequest
-    ( BodyReader,
-      Request,
-      Response(responseBody),
-      brRead,
-      withResponse,
-      mpost,
-      parse,
-      setHeader,
-      withJson, setResponseTimeout, HttpException (HttpExceptionRequest) )
-import Control.Lens ((^.), (&), ix, (%~), (^?))
-import Control.Monad.Cont
-    ( MonadIO(..), MonadTrans(lift), ContT, MonadCont(..) )
-import Data.Aeson ( Value (Null), decodeStrict, ToJSON(toJSON) )
-import Control.Monad.Trans.Cont (evalContT)
-import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as B
-import Data.Maybe (maybeToList, isJust)
-import Control.Monad (when)
-import Data.Monoid (First(First))
-import Data.Text (Text)
-import Control.Exception (catch, Exception (displayException), SomeException (SomeException))
-import Data.Aeson.Lens (key)
-
+import           Myai.Data.Config          (Config(Config,_ollama, _gpt, _azure), MonadAIReader, Error, MonadAI, manager, MonadAIError, createError)                                                                                                        -- 
+import qualified Myai.Data.GPT             as G                                                                                                                                                                                                             -- 
+import qualified Myai.Data.Azure           as A                                                                                                                                                                                                             -- 
+import           HTTP.Myrequest            (BodyReader, Request, Response(responseBody, responseStatus), brRead, withResponse, mpost, parse, setHeader, withJson, setResponseTimeout, HttpException(HttpExceptionRequest), requestWith, statusIsSuccessful) -- 
+import qualified Myai.Data.Ollama          as O                                                                                                                                                                                                             -- 
+import           Control.Monad.Reader      (ReaderT, runReaderT, MonadReader(ask), asks)                                                                                                                                                                    -- mtl-2.3.1
+import           Control.Monad.Except      (ExceptT, runExceptT, liftEither, throwError, MonadError(throwError))                                                                                                                                            -- mtl-2.3.1
+import           Control.Monad.Cont        (ContT, MonadCont(..))                                                                                                                                                                                           -- mtl-2.3.1
+import           Control.Lens              ((^.), (&), ix, (%~), (^?))                                                                                                                                                                                      -- lens-5.2.3
+import           Data.Text                 (Text)                                                                                                                                                                                                           -- text-2.0.2
+import           Control.Monad.IO.Class    (MonadIO(..))                                                                                                                                                                                                    -- base-4.18.2.1
+import           Data.Maybe                (maybeToList, isJust)                                                                                                                                                                                            -- base-4.18.2.1
+import           Control.Monad             (when, unless)                                                                                                                                                                                                   -- base-4.18.2.1
+import           Data.Monoid               (First(First))                                                                                                                                                                                                   -- base-4.18.2.1
+import           Control.Exception         (catch, Exception(displayException), SomeException(SomeException))                                                                                                                                               -- base-4.18.2.1
+import           Data.Aeson                (Value(Null), decodeStrict, ToJSON(toJSON), FromJSON, eitherDecode)                                                                                                                                              -- aeson-2.1.2.1
+import           Data.Aeson.Lens           (key)                                                                                                                                                                                                            -- lens-aeson-1.2.3
+import           Text.QuasiText            (embed)                                                                                                                                                                                                          -- QuasiText-0.1.2.6
+import           Data.ByteString           (ByteString)                                                                                                                                                                                                     -- bytestring-0.11.5.3
+import qualified Data.ByteString           as B                                                                                                                                                                                                             -- bytestring-0.11.5.3
+import qualified Data.ByteString.Char8     as B                                                                                                                                                                                                             -- bytestring-0.11.5.3
+import           Control.Monad.Trans.Class (MonadTrans(lift))                                                                                                                                                                                               -- transformers-0.6.1.0
+import           Control.Monad.Trans.Cont  (evalContT)                                                                                                                                                                                                      -- transformers-0.6.1.0
+import           Data.String.Conversions   (cs)                                                                                                                                                                                                             -- string-conversions-0.4.0.1
 
 runAIT ::  Config -> ReaderT Config (ExceptT Error m) a ->  m (Either Error a)
 runAIT config mAI = runExceptT $ runReaderT mAI config
@@ -42,17 +34,26 @@ useConfig :: MonadAIReader m => m Config
 useConfig = ask
 
 
-useGPTRequest :: MonadAIReader m => String -> m Request
+useGPTRequest :: MonadAI m => String -> m Request
 useGPTRequest restPath = do
     (Config {_gpt=gpt}) <- useConfig
+    let key = gpt ^. G.key
+    when (null key) $ throwError $ createError "No GPT config"
     pure $
-        setHeader ("Authorization", cs $ "Bearer " <>  gpt ^. G.key) $
+        setHeader ("Authorization", cs $ "Bearer " <>  key) $
         parse $ gpt ^. G.baseUrl <> restPath
 
+useOllamaRequest :: MonadAI m => String -> m Request
+useOllamaRequest restPath = do
+    (Config {_ollama=o}) <- useConfig
+    let baseURL = o ^. O.baseURL
+    when (null baseURL) $ throwError $ createError "No Ollama config"
+    pure $ parse $ baseURL <> restPath
 
-useAzureRequest :: MonadAIReader m => String -> m Request
+useAzureRequest :: MonadAI m => String -> m Request
 useAzureRequest deploymentId = do
     (Config {_azure=A.Azure { A._endpoint=endpoint,A._key=key}}) <- useConfig
+    when (null key) $ throwError $ createError "No Azure config"
     pure $
         setHeader ("api-key", cs key) $
         setResponseTimeout 0 $
@@ -139,10 +140,28 @@ recurValue a = do
                 pure ()
         pure (fn,x,a2)
 
-{- 
+
 mapLeft :: (a -> c) -> Either a b -> Either c b 
 mapLeft f (Left a) = Left $ f a
 mapLeft _ (Right b) = Right b
+
+usePost :: (ToJSON d, MonadAI m, FromJSON a, MonadIO m) => d -> Request -> m a
+usePost mydata request = do
+    config <- useConfig
+    eitherV <- liftIO $ do
+        mgr <-  config ^. manager
+        resp <- requestWith mgr $ 
+            withJson mydata $
+            mpost request
+        let isSuccess = statusIsSuccessful $ responseStatus resp
+        let body = responseBody resp
+        if isSuccess then 
+            pure $ eitherDecode body
+        else pure $ Left  (show resp)
+    liftEither $ mapLeft createError eitherV
+
+{- 
+
 
 eitherTransString :: Either String b -> Either AIError b
 eitherTransString = mapLeft $ First . Just . A.toJSON
@@ -160,20 +179,6 @@ useGET request = do
         else pure $ Left (show resp)
     liftEither $ eitherTransString $ eitherV
 
-usePOST :: (A.ToJSON d, MonadAI m, A.FromJSON a, MonadIO m) => d -> H.Request -> m a
-usePOST mydata request = do
-    mgrIO <- use'conf manager
-    eitherV <- liftIO $ do
-        mgr <-  mgrIO
-        resp <- H.requestWith mgr $ 
-            H.withJson mydata $
-            H.mpost request
-        let isSuccess = H.statusIsSuccessful $ H.responseStatus $ resp
-        let body = H.responseBody resp
-        if isSuccess then 
-            pure $ A.eitherDecode body
-        else pure $ Left (show resp)
-    liftEither $ eitherTransString $ eitherV
 
 -- useMicrosoftSpeech :: (MonadAI m,MonadIO m) => ByteString -> m L.ByteString
 -- useMicrosoftSpeech  xml = do
